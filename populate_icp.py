@@ -19,9 +19,19 @@ import argparse
 import json
 import requests
 import pandas
+import os
 import sys
 
-from bs4 import BeautifulSoup
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QHBoxLayout
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QLineEdit
+from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QWidget
+
+
 from html.parser import HTMLParser
 
 
@@ -42,21 +52,62 @@ def main():
     _parser.add_argument(
         '--tank-size',
         help='Total water volume (gallons)',
-        required=True,
         type=float
     )
     _parser.add_argument(
-        'analysis-id',
+        '--analysis-id',
         help="Public Analysis ID (number from the url following 'https://lab.atiaquaristik.com/publicAnalysis/'",
         type=str
     )
     args = _parser.parse_args()
+
+    main.analysis_number = str()
+    main.tank_size = float()
+    if args.analysis_id and args.tank_size:
+        main.analysis_number = args.analysis_id
+        main.tank_size = args.tank_size
+    else:
+        # spawn Qt GUI to get information
+        app = QApplication([])
+        window = QWidget()
+        layout = QVBoxLayout()
+        button = QPushButton('Get ICP Data')
+        # ICP ID Entry
+        icp_entry = QHBoxLayout()
+        icp_entry.addWidget(QLabel('ATI ICP Analysis ID:'))
+        icp_entry_edit = QLineEdit()
+        icp_entry.addWidget(icp_entry_edit)
+        # Tank Size Entry
+        tank_size_entry = QHBoxLayout()
+        tank_size_entry.addWidget(QLabel('Tank Size (gallons):'))
+        tank_size_edit = QLineEdit()
+        tank_size_entry.addWidget(tank_size_edit)
+        layout.addLayout(icp_entry)
+        layout.addLayout(tank_size_entry)
+        layout.addWidget(button)
+        window.setLayout(layout)
+        # Connect things together
+        def on_button_clicked():
+            try:
+                # Read text fields
+                # int(icp_entry_edit.text())
+                main.analysis_number = icp_entry_edit.text()
+                main.tank_size = float(tank_size_edit.text())
+                # close the window
+                window.close()
+            except ValueError:
+                alert = QMessageBox()
+                alert.setText('Please verify input information')
+                alert.exec()
+        button.clicked.connect(on_button_clicked)
+        window.show()
+        app.exec()
+
     # open reef moonshiners excel sheet
     workbook = load_workbook(filename='reef_moonshiners.xlsx')
 
     # grab report
-    analysis_number = getattr(args, 'analysis-id')
-    url = 'https://lab.atiaquaristik.com/publicAnalysis/' + analysis_number
+    url = 'https://lab.atiaquaristik.com/publicAnalysis/' + main.analysis_number
     r = requests.get(url)
 
     parser = ATIReportParser()
@@ -68,7 +119,7 @@ def main():
         values[parser.table[str(idx)]['element']['description_en']] = parser.table[str(idx)]['elements_value']
 
     icp_calc = workbook.active
-    icp_calc['F43'] = args.tank_size
+    icp_calc['F43'] = main.tank_size
     icp_calc['F52'] = values['Salinity']
     icp_calc['F71'] = values['Carbonate hardness']
     icp_calc['F91'] = values['Magnesium']
@@ -100,7 +151,11 @@ def main():
     icp_calc['F616'] = values['Aluminium']
     icp_calc['F629'] = values['Lanthanum']
 
-    workbook.save(filename=('reef_moonshiners_%s.xlsx' % analysis_number))
+    filename = 'reef_moonshiners_%s.xlsx' % main.analysis_number
+    workbook.save(filename=(filename))
+    box = QMessageBox()
+    box.setText("File saved as '%s'" % (os.path.join(os.getcwd(), filename)))
+    box.exec()
     return 0
 
 
