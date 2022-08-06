@@ -118,7 +118,8 @@ def main():
     for idx in range(0, 43):
         values[parser.table[str(idx)]['element']['description_en']] = parser.table[str(idx)]['elements_value']
 
-    icp_calc = workbook.active
+    # fill out the ICP Assesment Tool
+    icp_calc = workbook['ICP Assessment tool']
     icp_calc['F43'] = main.tank_size
     icp_calc['F52'] = values['Salinity']
     icp_calc['F71'] = values['Carbonate hardness']
